@@ -5,16 +5,7 @@ from dataclasses import dataclass
 
 @dataclass
 class ProviderConfig:
-    """Student TODO: define the provider configuration shared by the agents.
-
-    Required providers for this lab:
-    - openai
-    - custom (OpenAI-compatible base URL)
-    - gemini
-    - anthropic
-    - ollama
-    - openrouter
-    """
+    """Cấu hình provider dùng chung cho main model và judge model."""
 
     provider: str
     model_name: str
@@ -24,21 +15,80 @@ class ProviderConfig:
 
 
 def normalize_provider(value: str) -> str:
-    """Student TODO: map aliases like `anthorpic` -> `anthropic`."""
-
-    raise NotImplementedError
+    """Chuẩn hóa tên provider, xử lý typo phổ biến."""
+    aliases = {
+        "anthorpic": "anthropic",
+        "antrhropic": "anthropic",
+        "open_ai": "openai",
+        "open-ai": "openai",
+        "gpt": "openai",
+        "google": "gemini",
+        "google-genai": "gemini",
+    }
+    v = value.lower().strip()
+    return aliases.get(v, v)
 
 
 def build_chat_model(config: ProviderConfig):
-    """Student TODO: instantiate the real chat model for the selected provider.
+    """Khởi tạo LangChain chat model theo provider được chọn.
 
-    Pseudocode:
-    - `openai` -> `ChatOpenAI`
-    - `custom` -> `ChatOpenAI` with `base_url`
-    - `gemini` -> `ChatGoogleGenerativeAI`
-    - `anthropic` -> `ChatAnthropic`
-    - `ollama` -> `ChatOllama`
-    - `openrouter` -> `ChatOpenRouter`
+    Trả về None nếu package chưa cài (để offline mode vẫn chạy được).
     """
+    provider = normalize_provider(config.provider)
 
-    raise NotImplementedError
+    try:
+        if provider == "openai":
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                model=config.model_name,
+                temperature=config.temperature,
+                api_key=config.api_key,
+            )
+
+        if provider == "custom":
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                model=config.model_name,
+                temperature=config.temperature,
+                api_key=config.api_key or "custom",
+                base_url=config.base_url,
+            )
+
+        if provider == "gemini":
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            return ChatGoogleGenerativeAI(
+                model=config.model_name,
+                temperature=config.temperature,
+                google_api_key=config.api_key,
+            )
+
+        if provider == "anthropic":
+            from langchain_anthropic import ChatAnthropic
+            return ChatAnthropic(
+                model=config.model_name,
+                temperature=config.temperature,
+                api_key=config.api_key,
+            )
+
+        if provider == "ollama":
+            from langchain_ollama import ChatOllama
+            return ChatOllama(
+                model=config.model_name,
+                temperature=config.temperature,
+                base_url=config.base_url or "http://localhost:11434",
+            )
+
+        if provider == "openrouter":
+            from langchain_openai import ChatOpenAI
+            return ChatOpenAI(
+                model=config.model_name,
+                temperature=config.temperature,
+                api_key=config.api_key,
+                base_url="https://openrouter.ai/api/v1",
+            )
+
+    except ImportError:
+        # Package chưa cài -> chạy offline mode
+        return None
+
+    raise ValueError(f"Provider không hỗ trợ: {config.provider!r}")
